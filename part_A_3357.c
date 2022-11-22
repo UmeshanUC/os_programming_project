@@ -3,7 +3,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-// prototypes
 void OnError(char const *errorMsg);
 int GetTask();
 void InsertMarks(void);
@@ -27,6 +26,7 @@ struct student_marks marksArr[100];
 
 int main(int argc, char const *argv[])
 {
+  int errNo;
 
   // Initialize all marks records to null_marks
   for (int i = 0; i < 100; i++)
@@ -34,11 +34,33 @@ int main(int argc, char const *argv[])
     marksArr[i] = null_marks;
   }
 
-  FILE *fd;
-  fd = fopen("dataFile", "w");
-  if (fd == NULL)
+  FILE *fdRead, *fdWrite;
+  fdRead = fopen("dataFile", "r");
+  if (fdRead == NULL)
   {
-    OnError("fopen dataFile error: ");
+    if (errno == 2)
+    {
+      printf("dataFile not found\n");
+    }
+  }
+  else
+  {
+    while (!feof(fdRead))
+    {
+      fread(marksArr, sizeof(struct student_marks), 100, fdRead);
+
+      if ((errNo = ferror(fdRead)) > 0)
+      {
+        OnError("fread error: ");
+      }
+    }
+    printf("dataFile loaded successfully.\n");
+    printf("%s\n", marksArr[0].student_index);
+    printf("%f\n", marksArr[0].assgnmt01_marks);
+    printf("%f\n", marksArr[0].assgnmt02_marks);
+    printf("%f\n", marksArr[0].project_marks);
+    printf("%f\n", marksArr[0].finalExam_marks);
+    fclose(fdRead);
   }
 
   // Returning to user input on task completion forever.
@@ -65,16 +87,24 @@ int main(int argc, char const *argv[])
     }
 
     // writing marks changes to the file
-    int ret_fwrite = fwrite(&marksArr, sizeof(struct student_marks), sizeof(marksArr) / sizeof(struct student_marks), fd);
-    if (ret_fwrite < 0)
+    fdWrite = fopen("dataFile", "w");
+    if (fdWrite == NULL)
     {
-      OnError("fwrite error: ");
+      OnError("fopen dataFile for write, error: ");
     }
     else
     {
-      printf("successfully written to dataFile\n");
+      int ret_fwrite = fwrite(&marksArr, sizeof(struct student_marks), sizeof(marksArr) / sizeof(struct student_marks), fdWrite);
+      if (ret_fwrite < 0)
+      {
+        OnError("fwrite error: ");
+      }
+      else
+      {
+        printf("successfully written to dataFile\n");
+      }
     }
-    fclose(fd);
+    fclose(fdWrite);
   }
   return 0;
 }
@@ -170,15 +200,6 @@ void InsertMarks(void)
 
 void UpdateMarks(void)
 {
-  // Get whether to update or finish updates mode
-  printf("[default] Continue Update \t [q] Quit update mode\n");
-  if (getchar() == 'q' || getchar() == 'Q')
-  {
-    return;
-  }
-
-  // On continue update
-
   char regNo[12];
   // get student index to update
   printf("Enter student index (EG/XXXX/XXXX): ");
@@ -186,46 +207,61 @@ void UpdateMarks(void)
   FlushInputStream();
 
   int upIndex = GetArrIndexByRegNo(regNo);
-  if ((upIndex) == -1)
+  if (upIndex > -1)
   {
+    // On found
+
+    // get assgnmt01_marks
+    printf("Enter assgnmt01_marks(%%): ");
+    while (scanf(" %f\n", &marksArr[upIndex].assgnmt01_marks) < 1)
+    {
+      printf("Invalid assgnmt01_marks\n");
+      FlushInputStream();
+    }
+
+    // get assgnmt02_marks
+    printf("Enter assgnmt02_marks(%%): ");
+    while (scanf(" %f\n", &marksArr[upIndex].assgnmt02_marks) < 1)
+    {
+      printf("Invalid assgnmt02_marks\n");
+      FlushInputStream();
+    }
+
+    // get project_marks
+    printf("Enter project_marks(%%): ");
+    while (scanf(" %f\n", &marksArr[upIndex].project_marks) < 1)
+    {
+      printf("Invalid project_marks\n");
+      FlushInputStream();
+    }
+
+    // get finalExam_marks
+    printf("Enter finalExam_marks(%%): ");
+    while (scanf(" %f\n", &marksArr[upIndex].finalExam_marks) < 1)
+    {
+      printf("Invalid finalExam_marks\n");
+      FlushInputStream();
+    }
+  }
+  else
+  {
+    // On not found
     printf("student index not found. re-enter the student index\n");
+  }
+
+  // Get whether to insert more or finish insertion branch
+  printf("[default] Update more \t [q] Quit update mode\n");
+  FlushInputStream();
+  char ch = getchar();
+  if (ch == 'q' || ch == 'Q')
+  {
+    return;
+  }
+  else
+  {
     UpdateMarks();
+    return;
   }
-
-  // On found
-  // get assgnmt01_marks
-  printf("Enter assgnmt01_marks(%%): ");
-  while (scanf(" %f\n", &marksArr[upIndex].assgnmt01_marks) < 1)
-  {
-    printf("Invalid assgnmt01_marks\n");
-    FlushInputStream();
-  }
-
-  // get assgnmt02_marks
-  printf("Enter assgnmt02_marks(%%): ");
-  while (scanf(" %f\n", &marksArr[upIndex].assgnmt02_marks) < 1)
-  {
-    printf("Invalid assgnmt02_marks\n");
-    FlushInputStream();
-  }
-
-  // get project_marks
-  printf("Enter project_marks(%%): ");
-  while (scanf(" %f\n", &marksArr[upIndex].project_marks) < 1)
-  {
-    printf("Invalid project_marks\n");
-    FlushInputStream();
-  }
-
-  // get finalExam_marks
-  printf("Enter finalExam_marks(%%): ");
-  while (scanf(" %f\n", &marksArr[upIndex].finalExam_marks) < 1)
-  {
-    printf("Invalid finalExam_marks\n");
-    FlushInputStream();
-  }
-
-  UpdateMarks();
 }
 
 // returns index if found.
@@ -234,7 +270,7 @@ int GetArrIndexByRegNo(char RegNo[])
 {
   for (int i = 0; i < 100; i++)
   {
-    if (marksArr[i].student_index == RegNo)
+    if (!strcmp(marksArr[i].student_index, RegNo))
     {
       return i;
     }
@@ -246,15 +282,6 @@ int GetArrIndexByRegNo(char RegNo[])
 
 void DeleteMarks(void)
 {
-  // Get whether to delete or finish delete mode
-  printf("[default] Continue Delete \t [q] Quit Delete Mode\n");
-  if (getchar() == 'q' || getchar() == 'Q')
-  {
-    return;
-  }
-
-  // On continue delete
-
   char regNo[12];
   // get student index to delete
   printf("Enter student index (EG/XXXX/XXXX): ");
@@ -262,17 +289,29 @@ void DeleteMarks(void)
   FlushInputStream();
 
   int delIndex = GetArrIndexByRegNo(regNo);
-  if (delIndex == -1)
+  if (delIndex > -1)
+  {
+    // On found
+    marksArr[delIndex] = null_marks; // Delete the specified marks object
+  }
+  else
   {
     printf("student index not found. re-enter the student index\n");
-    DeleteMarks();
   }
 
-  // On found
-
-  marksArr[delIndex] = null_marks; // Delete the specified marks object
-
-  DeleteMarks();
+  // Get whether to insert more or finish insertion branch
+  printf("[default] Delete more \t [q] Quit delete mode\n");
+  char ch = getchar();
+  FlushInputStream();
+  if (ch == 'q' || ch == 'Q')
+  {
+    return;
+  }
+  else
+  {
+    DeleteMarks();
+    return;
+  }
 }
 
 void FlushInputStream(void)
