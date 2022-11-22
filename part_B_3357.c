@@ -9,6 +9,8 @@
 #include <sys/shm.h>
 #include <sys/stat.h>
 #include <string.h>
+#include <semaphore.h>
+#include <pthread.h>
 
 #define MIN 1
 #define MAX 2
@@ -36,18 +38,29 @@ struct student_marks
 // Data structure used to transfer calculation results
 struct results
 {
-  float min;        // 1
-  float max;        // 2
-  float avg;        // 3
-  float above10Num; // 4
+  float min;      // 1
+  float max;      // 2
+  float avg;      // 3
+  int above10Num; // 4
 };
+
+struct results null_result = {0.0, 0.0, 0.0, 0};
 
 struct student_marks null_marks = {"NULL", 0.0, 0.0, 0.0, 0.0};
 
 struct student_marks marksArr[100];
 
+const char *sem_name = "/sem01";
+sem_t *sem01;
+
 int main(int argc, char const *argv[])
 {
+  sem01 = sem_open(sem_name, O_CREAT, 0666, 1);
+  if (sem01 == SEM_FAILED)
+  {
+    OnError("sem_open error: ");
+  }
+
   pid_t PID_C1;
   pid_t PID_CC1;
   pid_t PID_CC2;
@@ -80,23 +93,22 @@ int main(int argc, char const *argv[])
   {
     struct results receivedResults;
     struct results *ptr;
-    ptr = (struct results *)shmat(SMID, NULL, SHM_W);
+    ptr = (struct results *)shmat(SMID, NULL, SHM_R);
     if (ptr == (void *)-1)
     {
       OnError("parent shmat error: ");
     }
 
+    // wait for each and print outputs
     waitpid(PID_C1, NULL, 0);
-    waitpid(PID_CC1, NULL, 0);
-    waitpid(PID_CC2, NULL, 0);
-    waitpid(PID_CC3, NULL, 0);
-    shmdt(ptr);
+    receivedResults = *(ptr);
 
-    // Outputs
     printf("Min value: %f\n", receivedResults.min);
     printf("Max value: %f\n", receivedResults.max);
     printf("Avg value: %f\n", receivedResults.avg);
-    printf("Number of students above 10%%: %f\n", receivedResults.above10Num);
+    printf("Number of students above 10%%: %d\n", receivedResults.above10Num);
+
+    shmdt(ptr);
   }
   else if (PID_C1 == 0) // C1
   {
@@ -108,8 +120,12 @@ int main(int argc, char const *argv[])
     }
     else if (PID_CC1 > 0) // C1
     {
+      float min = CalAss02_Min();
+      SendViaSM(min, SMID, MIN);
 
       waitpid(PID_CC1, NULL, 0);
+      waitpid(PID_CC2, NULL, 0);
+      waitpid(PID_CC3, NULL, 0);
     }
     else if (PID_CC1 == 0) // CC1
     {
@@ -126,8 +142,6 @@ int main(int argc, char const *argv[])
     }
     else if (PID_CC2 > 0) // C1
     {
-
-      waitpid(PID_CC2, NULL, 0);
     }
     else if (PID_CC2 == 0) // CC2
     {
@@ -144,21 +158,20 @@ int main(int argc, char const *argv[])
     }
     else if (PID_CC3 > 0) // C1
     {
-
-      waitpid(PID_CC3, NULL, 0);
     }
     else if (PID_CC1 == 0) // CC3
     {
       int above10Num = CalAss02_Above10_Num();
+
       SendViaSM(above10Num, SMID, ABOVE10NUM);
     }
 #pragma endregion
-
-    float min = CalAss02_Min();
-    SendViaSM(min, SMID, MIN);
   }
 
   shmctl(SMID, IPC_RMID, NULL);
+  sem_close(sem01);
+  sem_unlink(sem_name);
+  sem_destroy(sem01);
   return 0;
 }
 
@@ -173,7 +186,7 @@ void OnError(char const *errorMsg)
 void LoadData(void)
 {
   int errNo;
-  FILE *fdRead, *fdWrite;
+  FILE *fdRead;
   fdRead = fopen("dataFile", "r");
   if (fdRead == NULL)
   {
@@ -187,7 +200,6 @@ void LoadData(void)
     while (!feof(fdRead))
     {
       fread(marksArr, sizeof(struct student_marks), 100, fdRead);
-
       if ((errNo = ferror(fdRead)) > 0)
       {
         OnError("fread error: ");
@@ -195,47 +207,40 @@ void LoadData(void)
     }
     printf("dataFile loaded successfully.\n");
 
-    // // for testing
-    //  printf("%s\n", marksArr[0].student_index);
-    //  printf("%f\n", marksArr[0].assgnmt01_marks);
-    //  printf("%f\n", marksArr[0].assgnmt02_marks);
-    //  printf("%f\n", marksArr[0].project_marks);
-    //  printf("%f\n", marksArr[0].finalExam_marks);
-    //  fclose(fdRead);
+    fclose(fdRead);
   }
 }
 
 /// @brief Calculating Min student record for Assignment02 marks
 float CalAss02_Min(void)
 {
-  float min = 100; // current min
-  int indexOfMin;  // Index of student record with min assign02 marks
+  float min = (float)100; // current min
   for (int i = 0; i < 100; i++)
   {
+
     // assign as new min if the current marks is lesser than current min
     if (min > marksArr[i].assgnmt02_marks)
     {
       min = marksArr[i].assgnmt02_marks;
-      indexOfMin = i;
     }
   }
+  // printf("min: %f\n", min);
   return min;
 }
 
 /// @brief Calculating Max student record for Assignment02 marks
 float CalAss02_Max(void)
 {
-  float max = 100; // current max
-  int indexOfMax;  // Index of student record with max assign02 marks
+  float max; // current max
   for (int i = 0; i < 100; i++)
   {
     // assign as new max if the current marks is higher than current max
     if (max < marksArr[i].assgnmt02_marks)
     {
       max = marksArr[i].assgnmt02_marks;
-      indexOfMax = i;
     }
   }
+  // printf("max: %f\n", max);
   return max;
 }
 
@@ -243,14 +248,20 @@ float CalAss02_Max(void)
 float CalAss02_Avg(void)
 {
   float sum;
-  int num;
+  int num = 0;
   for (int i = 0; i < 100; i++)
   {
-    if (!strcmp(marksArr[i].student_index, null_marks.student_index))
+    if (strcmp(marksArr[i].student_index, null_marks.student_index))
     {
       num++;
+      sum += marksArr[i].assgnmt02_marks;
     }
-    sum += marksArr[i].assgnmt02_marks;
+  }
+  // printf("avg: %f\n", sum / num);
+  if (num == 0)
+  {
+    printf("Cal avg error, records not found.\n");
+    return 0.0;
   }
   return sum / num;
 }
@@ -258,7 +269,7 @@ float CalAss02_Avg(void)
 /// @brief Calculating Number of students above 10% for Assignment02 marks
 int CalAss02_Above10_Num(void)
 {
-  int num;
+  int num = 0;
   for (int i = 0; i < 100; i++)
   {
     if (marksArr[i].assgnmt02_marks > (float)10)
@@ -266,17 +277,21 @@ int CalAss02_Above10_Num(void)
       num++;
     }
   }
+  // printf("num: %d\n", num);
   return num;
 }
 
 void SendViaSM(float value, int SMID, int type)
 {
+  sem_wait(sem01);
+
   struct results *ptr;
   ptr = (struct results *)shmat(SMID, NULL, SHM_W);
   if (ptr == (struct results *)-1)
   {
     OnError("shmat error: ");
   }
+
   switch (type)
   {
   case MIN:
@@ -291,9 +306,10 @@ void SendViaSM(float value, int SMID, int type)
   case ABOVE10NUM:
     ptr->above10Num = value;
     break;
-
   default:
+    *(ptr) = null_result;
     break;
   }
   shmdt(ptr);
+  sem_post(sem01);
 }

@@ -2,6 +2,7 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 void OnError(char const *errorMsg);
 int GetTask();
@@ -9,6 +10,7 @@ void InsertMarks(void);
 void UpdateMarks(void);
 void DeleteMarks(void);
 int GetArrIndexByRegNo(char RegNo[]);
+void RandGen(void);
 void FlushInputStream(void);
 
 struct student_marks
@@ -27,6 +29,7 @@ struct student_marks marksArr[100];
 int main(int argc, char const *argv[])
 {
   int errNo;
+  srand(time(NULL));
 
   // Initialize all marks records to null_marks
   for (int i = 0; i < 100; i++)
@@ -55,11 +58,15 @@ int main(int argc, char const *argv[])
       }
     }
     printf("dataFile loaded successfully.\n");
-    // printf("%s\n", marksArr[0].student_index);
-    // printf("%f\n", marksArr[0].assgnmt01_marks);
-    // printf("%f\n", marksArr[0].assgnmt02_marks);
-    // printf("%f\n", marksArr[0].project_marks);
-    // printf("%f\n", marksArr[0].finalExam_marks);
+    for (int i = 0; i < 100; i++)
+    {
+      // // printf("\n%s\n", marksArr[i].student_index);
+      // printf("assgnmt01_marks\t\t: %.2f\n", marksArr[i].assgnmt01_marks);
+      // printf("assgnmt02_marks\t\t: %.2f\n", marksArr[i].assgnmt02_marks);
+      // printf("project_marks\t\t: %.2f\n", marksArr[i].project_marks);
+      // printf("finalExam_marks\t\t: %.2f\n", marksArr[i].finalExam_marks);
+    }
+
     fclose(fdRead);
   }
 
@@ -79,6 +86,10 @@ int main(int argc, char const *argv[])
       break;
     case 3: // delete
       DeleteMarks();
+      break;
+
+    case 4: // rand-gen
+      RandGen();
       break;
 
     default:
@@ -120,10 +131,10 @@ int GetTask()
 {
   char input;
   printf("Enter the task to perform.\n");
-  printf("[1] Insert \t [2] Update \t [3] Delete\n");
+  printf("[1] Insert \t [2] Update \t [3] Delete \t [4] Random Generator\n");
   input = getchar();
   FlushInputStream();
-  if (input <= '3' && input >= '1')
+  if (input <= '4' && input >= '1')
   {
     return atoi(&input);
   }
@@ -319,4 +330,31 @@ void FlushInputStream(void)
   char ch;
   while ((ch = getchar()) != '\n' && ch != EOF)
     ;
+}
+
+void RandGen(void)
+{
+
+  for (int i = 0; i < 100; i++)
+  {
+    // student id generation
+    char RegNo[12] = "EG/2018/33";
+    char No[2];
+    sprintf(No, "%d", i);
+
+    while (strlen(No) < 2)
+    {
+      char temp[4] = "0";
+      strcat(temp, No);
+      strcpy(No, temp);
+    }
+    strcat(RegNo, No);
+
+    // assigning to marksArr
+    strcpy(marksArr[i].student_index, RegNo);
+    marksArr[i].assgnmt01_marks = (float)(rand() % 15);
+    marksArr[i].assgnmt02_marks = (float)(rand() % 15);
+    marksArr[i].project_marks = (float)(rand() % 20);
+    marksArr[i].finalExam_marks = (float)(rand() % 50);
+  }
 }
