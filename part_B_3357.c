@@ -11,6 +11,7 @@
 
 // prototypes
 void OnError(char const *errorMsg);
+void LoadData(void);
 
 struct student_marks
 {
@@ -28,6 +29,23 @@ int main(int argc, char const *argv[])
   pid_t PID_CC1;
   pid_t PID_CC2;
   pid_t PID_CC3;
+
+  // Loading data from dataFile
+  LoadData();
+
+  // Creating a file token to use as key in shmget
+  key_t ky = ftok("dataFile", 11);
+  if (ky == -1)
+  {
+    OnError("ftok error: ");
+  }
+
+  // Requesting a shared memory segment
+  int SMID = shmget(ky, 4096, IPC_CREAT | 0666);
+  if (SMID == -1)
+  {
+    OnError("shmget error: ");
+  }
 
   // Creating the child process C1
   PID_C1 = fork();
@@ -101,4 +119,40 @@ void OnError(char const *errorMsg)
   printf("Error No. %d\n", errno);
   perror(errorMsg);
   exit(1);
+}
+
+/// @brief Loading data to marksArr from the dataFile
+void LoadData(void)
+{
+  int errNo;
+  FILE *fdRead, *fdWrite;
+  fdRead = fopen("dataFile", "r");
+  if (fdRead == NULL)
+  {
+    if (errno == 2)
+    {
+      printf("dataFile not found\n");
+    }
+  }
+  else
+  {
+    while (!feof(fdRead))
+    {
+      fread(marksArr, sizeof(struct student_marks), 100, fdRead);
+
+      if ((errNo = ferror(fdRead)) > 0)
+      {
+        OnError("fread error: ");
+      }
+    }
+    printf("dataFile loaded successfully.\n");
+
+    // // for testing
+    //  printf("%s\n", marksArr[0].student_index);
+    //  printf("%f\n", marksArr[0].assgnmt01_marks);
+    //  printf("%f\n", marksArr[0].assgnmt02_marks);
+    //  printf("%f\n", marksArr[0].project_marks);
+    //  printf("%f\n", marksArr[0].finalExam_marks);
+    //  fclose(fdRead);
+  }
 }

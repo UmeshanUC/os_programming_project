@@ -55,11 +55,11 @@ int main(int argc, char const *argv[])
       }
     }
     printf("dataFile loaded successfully.\n");
-    printf("%s\n", marksArr[0].student_index);
-    printf("%f\n", marksArr[0].assgnmt01_marks);
-    printf("%f\n", marksArr[0].assgnmt02_marks);
-    printf("%f\n", marksArr[0].project_marks);
-    printf("%f\n", marksArr[0].finalExam_marks);
+    // printf("%s\n", marksArr[0].student_index);
+    // printf("%f\n", marksArr[0].assgnmt01_marks);
+    // printf("%f\n", marksArr[0].assgnmt02_marks);
+    // printf("%f\n", marksArr[0].project_marks);
+    // printf("%f\n", marksArr[0].finalExam_marks);
     fclose(fdRead);
   }
 
